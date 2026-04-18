@@ -52,15 +52,17 @@ static void task_main(void *pvParameters);  // prototype
 static void task_main(void *pvParameters) { // FreeRTOS task signature
     QActive * const act = (QActive *)pvParameters;
 
-    // event-loop...
+    // the event-loop...
 #ifdef QACTIVE_CAN_STOP
     while (act->eQueue != (QueueHandle_t)0) {
 #else
     for (;;) { // for-ever
 #endif
-        QEvt const * const e = QActive_get_(act); // WAIT for event
+        QEvt const * const e = QActive_get_(act); // BLOCK for event
         QASM_DISPATCH(act, e, act->prio); // dispatch event (virtual call)
+#if (QF_MAX_EPOOL > 0U)
         QF_gc(e); // check if the event is garbage, and collect it if so
+#endif
     }
 #ifdef QACTIVE_CAN_STOP
     QActive_unregister_(act); // remove this object from the framewrok
@@ -94,12 +96,11 @@ bool QActive_post_(QActive * const me,
     Q_REQUIRE_INCRIT(100, e != (QEvt *)0);
 
     // the number of free slots available in the FreeRTOS queue
-    uint_fast16_t const nFree =
-        (uint_fast16_t)FREERTOS_QUEUE_GET_FREE(me);
+    QEQueueCtr const nFree =
+        (QEQueueCtr)FREERTOS_QUEUE_GET_FREE(me);
 
-    // should we try to post the event?
-    bool status = ((margin == QF_NO_MARGIN) || (nFree > (QEQueueCtr)margin));
-
+    bool status = ((margin == QF_NO_MARGIN)
+        || (nFree > (QEQueueCtr)margin));
     if (status) { // should try to post the event?
 #if (QF_MAX_EPOOL > 0U)
         if (e->poolNum_ != 0U) { // is it a mutable event?
@@ -107,6 +108,7 @@ bool QActive_post_(QActive * const me,
         }
 #endif // (QF_MAX_EPOOL > 0U)
 
+        // assume that event posting will be successful, see NOTE3
         QS_BEGIN_PRE(QS_QF_ACTIVE_POST, me->prio)
             QS_TIME_PRE();      // timestamp
             QS_OBJ_PRE(sender); // the sender object
@@ -119,14 +121,17 @@ bool QActive_post_(QActive * const me,
 
         QF_CRIT_EXIT(); // exit crit.sect. before calling RTOS API
 
-        // post the event to the FreeRTOS event queue, see NOTE3
+        // post the following evtPtr to the RTOS event queue, see NOTE3
+        QEvtPtr const evtPtr = {
+            e
+        };
         status = (xQueueSendToBack(
-            me->eQueue, (void const *)&e, (TickType_t)0) == pdPASS);
+            me->eQueue, (void const *)&evtPtr, 0U) == pdPASS);
+
+        QF_CRIT_ENTRY(); // re-enter crit.sec.
     }
 
     if (!status) { // event NOT posted?
-        QF_CRIT_ENTRY();
-
         // posting is allowed to fail only when margin != QF_NO_MARGIN
         Q_ASSERT_INCRIT(130, margin != QF_NO_MARGIN);
 
@@ -136,7 +141,7 @@ bool QActive_post_(QActive * const me,
             QS_SIG_PRE(e->sig); // the signal of the event
             QS_OBJ_PRE(me);     // this active object (recipient)
             QS_2U8_PRE(e->poolNum_, e->refCtr_); // pool-Num & ref-Count
-            QS_EQC_PRE(nFree);  // # free entries available
+            QS_EQC_PRE(nFree);  // # free entries
             QS_EQC_PRE(margin); // margin requested
         QS_END_PRE()
 
@@ -145,6 +150,9 @@ bool QActive_post_(QActive * const me,
 #if (QF_MAX_EPOOL > 0U)
         QF_gc(e); // recycle the event to avoid a leak
 #endif
+    }
+    else {
+        QF_CRIT_EXIT();
     }
 
     return status;
@@ -169,14 +177,18 @@ void QActive_postLIFO_(QActive * const me, QEvt const * const e) {
         QS_SIG_PRE(e->sig);  // the signal of this event
         QS_OBJ_PRE(me);      // this active object
         QS_2U8_PRE(e->poolNum_, e->refCtr_); // pool-Num & ref-Count
-        QS_EQC_PRE(FREERTOS_QUEUE_GET_FREE(me)); // # free entries available
+        QS_EQC_PRE(FREERTOS_QUEUE_GET_FREE(me)); // # free entries
         QS_EQC_PRE(0U);      // min # free entries (unknown)
     QS_END_PRE()
 
     QF_CRIT_EXIT(); // exit crit.sect. before calling RTOS API
 
+    // post the following evtPtr to the RTOS event queue, see NOTE3
+    QEvtPtr const evtPtr = {
+        e
+    };
     BaseType_t const err =
-        xQueueSendToFront(me->eQueue, (void const *)&e, (TickType_t)0);
+        xQueueSendToFront(me->eQueue, (void const *)&evtPtr, 0U);
 
 #ifndef Q_UNSAFE
     QF_CRIT_ENTRY();
@@ -191,8 +203,9 @@ void QActive_postLIFO_(QActive * const me, QEvt const * const e) {
 //! @private @memberof QActive
 QEvt const *QActive_get_(QActive * const me) {
     // wait for an event (forever)
-    QEvtPtr e;
-    BaseType_t const err = xQueueReceive(me->eQueue, (void *)&e, portMAX_DELAY);
+    QEvtPtr evtPtr;
+    BaseType_t const err = xQueueReceive(me->eQueue,
+        (void *)&evtPtr, portMAX_DELAY);
 
     QF_CRIT_STAT
     QF_CRIT_ENTRY();
@@ -205,15 +218,15 @@ QEvt const *QActive_get_(QActive * const me) {
 
     QS_BEGIN_PRE(QS_QF_ACTIVE_GET, me->prio)
         QS_TIME_PRE();       // timestamp
-        QS_SIG_PRE(e->sig);  // the signal of this event
+        QS_SIG_PRE(evtPtr.e->sig); // the signal of this event
         QS_OBJ_PRE(me);      // this active object
-        QS_2U8_PRE(e->poolNum_, e->refCtr_); // pool-Num & ref-Count
+        QS_2U8_PRE(evtPtr.e->poolNum_, evtPtr.e->refCtr_);
         QS_EQC_PRE(FREERTOS_QUEUE_GET_FREE(me)); // # free entries available
     QS_END_PRE()
 
     QF_CRIT_EXIT();
 
-    return e;
+    return evtPtr.e;
 }
 //............................................................................
 //! @static @public @memberof QActive
@@ -341,12 +354,12 @@ bool QActive_postFromISR_(QActive * const me,
     Q_REQUIRE_INCRIT(600, e != (QEvt *)0);
 
     // the number of free slots available in the FreeRTOS queue
-    uint_fast16_t const nFree =
-        (uint_fast16_t)FREERTOS_QUEUE_GET_FREE(me);
+    QEQueueCtr const nFree =
+        (QEQueueCtr)FREERTOS_QUEUE_GET_FREE(me);
 
     // should we try to post the event?
-    bool status = ((margin == QF_NO_MARGIN) || (nFree > (QEQueueCtr)margin));
-
+    bool status = ((margin == QF_NO_MARGIN)
+        || (nFree > (QEQueueCtr)margin));
     if (status) { // should try to post the event?
 #if (QF_MAX_EPOOL > 0U)
         if (e->poolNum_ != 0U) { // is it a mutable event?
@@ -367,14 +380,17 @@ bool QActive_postFromISR_(QActive * const me,
         // exit crit.sect. before calling RTOS API
         portCLEAR_INTERRUPT_MASK_FROM_ISR(uxSavedInterruptStatus);
 
-        // post the event to the FreeRTOS event queue, see NOTE3
+        // post the following evtPtr to the RTOS event queue, see NOTE3
+        QEvtPtr const evtPtr = {
+            e
+        };
         status = (xQueueSendToBackFromISR(me->eQueue,
-            (void const *)&e, pxHigherPriorityTaskWoken) == pdPASS);
+            (void const *)&evtPtr, pxHigherPriorityTaskWoken) == pdPASS);
+
+        uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
     }
 
     if (!status) { // event NOT posted?
-        uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
-
         // posting is allowed to fail only when margin != QF_NO_MARGIN
         Q_ASSERT_INCRIT(630, margin != QF_NO_MARGIN);
 
@@ -393,6 +409,9 @@ bool QActive_postFromISR_(QActive * const me,
 #if (QF_MAX_EPOOL > 0U)
         QF_gcFromISR(e); // recycle the event to avoid a leak
 #endif
+    }
+    else {
+        portCLEAR_INTERRUPT_MASK_FROM_ISR(uxSavedInterruptStatus);
     }
 
     return status;

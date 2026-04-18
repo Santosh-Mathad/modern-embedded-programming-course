@@ -1182,7 +1182,7 @@ static void QS_rxHandleGoodEvt_(void) {
             QEvt_refCtr_inc_(QS_rxPriv_->var.evt.e);
 
             if (sm->vptr != (void *)0) {
-                (*sm->vptr->dispatch)(sm, QS_rxPriv_->var.evt.e, 0U);
+                QASM_DISPATCH(sm, QS_rxPriv_->var.evt.e, 0U);
                 stat = 0x01U; // success status, recycle needed
             }
             else {
@@ -1202,7 +1202,7 @@ static void QS_rxHandleGoodEvt_(void) {
             QEvt_refCtr_inc_(QS_rxPriv_->var.evt.e);
 
             if (sm->vptr != (void *)0) {
-                (*sm->vptr->init)(sm, QS_rxPriv_->var.evt.e, 0U);
+                QASM_INIT(sm, QS_rxPriv_->var.evt.e, 0U);
                 stat = 0x01U; // success status, recycle needed
             }
             else {

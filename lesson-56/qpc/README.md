@@ -1,8 +1,3 @@
-> NOTE: This is __NOT__ the full distribution of the QP/C framework.
-This version contains only the files needed for this particular
-lesson in the "Modern Embedded Systems Programming" course. Please
-see [Quantum Leaps downloads][Down] for the complete version.
-
 ![QP Framework](https://www.state-machine.com/img/qp_banner.jpg)
 
 # What's New?
@@ -34,6 +29,14 @@ supports Hierarchical State Machines with which to specify the behavior of
 Active Objects [UML 2.5], [Sutter:10], [ROOM:94]. The QP/C Framework can be
 viewed as a modern, asynchronous, and truly event-driven real-time operating
 system (RTOS).
+
+## State Machines to Code
+The behavior of active objects is specified in QP/C by means of
+[hierarchical state machines (UML statecharts)][HSM]. The framework supports manual
+coding of UML state machines in C as well as fully automatic code generation using
+the free graphical [QM model-based design (MBD) tool][QM].
+
+![Blinky state machine and the code](https://www.state-machine.com/img/blinky_smc.png)
 
 ## QP Framework Family
 QP/C framework is part of the larger QP family, consisting of the following
@@ -172,7 +175,6 @@ If you like this project, please give it a star (in the upper-right corner of yo
 <img src="https://www.state-machine.com/img/github-star.jpg"/><br>
 </p>
 
-   [Down]:   <https://www.state-machine.com#Downloads>
    [Cont]:   <https://www.state-machine.com/contact>
    [RTEF]:   <https://www.state-machine.com/rtef>
    [QP]:     <https://www.state-machine.com/products/qp>

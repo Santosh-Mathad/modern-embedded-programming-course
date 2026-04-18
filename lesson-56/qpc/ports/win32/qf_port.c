@@ -252,15 +252,17 @@ static DWORD WINAPI ao_thread(LPVOID arg) { // for CreateThread()
     EnterCriticalSection(&l_startupCritSect);
     LeaveCriticalSection(&l_startupCritSect);
 
+    // the event-loop...
 #ifdef QACTIVE_CAN_STOP
-    while (act->thread)
+    while (act->thread) {
 #else
-    for (;;) // for-ever
+    for (;;) { // for-ever
 #endif
-    {
-        QEvt const *e = QActive_get_(act); // wait for event
-        QASM_DISPATCH(&act->super, e, act->prio); // dispatch to the SM
+        QEvt const *e = QActive_get_(act); // BLOCK for event
+        QASM_DISPATCH(act, e, act->prio); // dispatch to the SM
+#if (QF_MAX_EPOOL > 0U)
         QF_gc(e); // check if the event is garbage, and collect it if so
+#endif
     }
 #ifdef QACTIVE_CAN_STOP
     QActive_unregister_(act); // un-register this AO

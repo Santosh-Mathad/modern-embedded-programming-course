@@ -145,7 +145,7 @@ uint_fast8_t QK_sched_act_(
     // NOTE: this function is entered with interrupts DISABLED
 
     uint8_t p = act->prio;
-    if (act->eQueue.frontEvt == (QEvt *)0) { // empty queue?
+    if (act->eQueue.frontEvt.e == (QEvt *)0) { // empty queue?
         QPSet_remove(&QK_priv_.readySet, p);
     }
 
@@ -232,13 +232,12 @@ void QK_activate_(void) {
 
         QF_INT_ENABLE(); // unconditionally enable interrupts
 
-        QEvt const * const e = QActive_get_(a);
+        QEvt const * const e = QActive_get_(a); // queue not empty
         // NOTE QActive_get_() performs QF_MEM_APP() before return
 
-        // dispatch event (virtual call)
-        QASM_DISPATCH(a, e, p);
+        QASM_DISPATCH(a, e, p); // dispatch event (virtual call)
 #if (QF_MAX_EPOOL > 0U)
-        QF_gc(e);
+        QF_gc(e); // check if the event is garbage, and collect it if so
 #endif
 
         // determine the next highest-prio. AO ready to run...

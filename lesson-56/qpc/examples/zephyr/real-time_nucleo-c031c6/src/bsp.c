@@ -28,7 +28,7 @@
 //============================================================================
 #include "qpc.h"                 // QP/C real-time event framework
 #include "bsp.h"                 // Board Support Package
-#include "app.h"                 // Application interface
+#include "app.h"                 // Application
 
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/reboot.h>
@@ -65,9 +65,9 @@ Q_NORETURN Q_onError(char const * const module, int_t const id) {
     Q_UNUSED_PAR(module);
     Q_UNUSED_PAR(id);
     QS_ASSERTION(module, id, 10000U); // report assertion to QS
-    Q_PRINTK("\nERROR in %s:%d\n", module, id);
 
 #ifndef NDEBUG
+    Q_PRINTK("\nERROR in %s:%d\n", module, id);
     k_panic(); // debug build: halt the system for error search...
 #endif
 
@@ -132,7 +132,9 @@ static void custom_tick_callback(struct k_timer *tid) {
 }
 
 // BSP functions =============================================================
-void BSP_init(void) {
+void BSP_init(void const * const arg) {
+    Q_UNUSED_PAR(arg);
+
     // NOTE: the CPU clock is configured in Zephyr (48MHz)
 
     // Configure the MPU to prevent NULL-pointer dereferencing ...
@@ -174,9 +176,7 @@ void BSP_init(void) {
     // configure Button B1 pin on GPIOC as input, no pull-up, pull-down
     GPIOC->MODER &= ~(3U << 2U*B1_PIN);
     GPIOC->PUPDR &= ~(3U << 2U*B1_PIN);
-}
-//............................................................................
-void BSP_start(void) {
+
     // instantiate and start QP/C active objects...
     Periodic1_ctor();
     static QEvtPtr periodic1QSto[10]; // Event queue storage

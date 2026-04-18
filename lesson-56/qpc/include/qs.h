@@ -527,7 +527,7 @@ uint8_t const * QS_getBlock(uint16_t * const pNbytes);
 void QS_doOutput(void);
 
 //! @static @public @memberof QS
-uint8_t QS_onStartup(void const * arg);
+uint8_t QS_onStartup(void const * const arg);
 
 //! @static @public @memberof QS
 void QS_onCleanup(void);

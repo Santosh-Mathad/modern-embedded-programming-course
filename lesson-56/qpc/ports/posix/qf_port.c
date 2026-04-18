@@ -301,9 +301,11 @@ static void *thread_routine(void *arg) { // the expected POSIX signature
     for (;;) // for-ever
 #endif
     {
-        QEvt const *e = QActive_get_(act); // wait for event
-        QASM_DISPATCH(&act->super, e, act->prio); // dispatch to the HSM
+        QEvt const *e = QActive_get_(act); // BLOCK for event
+        QASM_DISPATCH(act, e, act->prio); // dispatch event (virtual call)
+#if (QF_MAX_EPOOL > 0U)
         QF_gc(e); // check if the event is garbage, and collect it if so
+#endif
     }
 #ifdef QACTIVE_CAN_STOP
     QActive_unregister_(act); // un-register this active object

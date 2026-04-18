@@ -28,7 +28,7 @@
 //============================================================================
 #include "qpc.h"                 // QP/C real-time event framework
 #include "bsp.h"                 // Board Support Package
-#include "app.h"                 // Application interface
+#include "app.h"                 // Application
 
 #include "stm32c0xx.h"  // CMSIS-compliant header file for the MCU used
 // add other drivers if necessary...
@@ -62,8 +62,7 @@ Q_DEFINE_THIS_FILE  // define the name of this file for assertions
 
 Q_NORETURN Q_onError(char const * const module, int_t const id) {
     // NOTE: this implementation of the error handler is intended only
-    // for debugging and MUST be changed for deployment of the application
-    // (assuming that you ship your production code with assertions enabled).
+    // for debugging and MUST be changed for deployment of the application.
     Q_UNUSED_PAR(module);
     Q_UNUSED_PAR(id);
     QS_ASSERTION(module, id, 10000U); // report assertion to QS
@@ -71,17 +70,15 @@ Q_NORETURN Q_onError(char const * const module, int_t const id) {
 #ifndef NDEBUG
     // light up the user LED
     GPIOA->BSRR = (1U << TST7_PIN);  // turn LED on
-    // for debugging, hang on in an endless loop...
-    for (;;) {
+    for (;;) { // for debugging, hang on in an endless loop...
     }
 #endif
-
     NVIC_SystemReset();
     for (;;) { // explicitly "no-return"
     }
 }
 //............................................................................
-// assertion failure handler for the STM32 library, including the startup code
+// assertion failure handler for the startup and library code
 void assert_failed(char const * const module, int_t const id); // prototype
 void assert_failed(char const * const module, int_t const id) {
     Q_onError(module, id);
@@ -151,7 +148,6 @@ void vApplicationTickHook(void) {
 
     BSP_d1off();
 }
-
 //............................................................................
 void vApplicationIdleHook(void) {
     BSP_d7on(); // LED LD4
@@ -159,8 +155,8 @@ void vApplicationIdleHook(void) {
 }
 //............................................................................
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
-    (void)xTask;
-    (void)pcTaskName;
+    Q_UNUSED_PAR(xTask);
+    Q_UNUSED_PAR(pcTaskName);
     Q_ERROR();
 }
 //............................................................................
@@ -192,8 +188,12 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer,
     *pulIdleTaskStackSize = Q_DIM(uxIdleTaskStack);
 }
 
-// BSP functions =============================================================
-void BSP_init(void) {
+//============================================================================
+// BSP functions...
+
+void BSP_init(void const * const arg) {
+    Q_UNUSED_PAR(arg);
+
     // Configure the MPU to prevent NULL-pointer dereferencing ...
     MPU->RBAR = 0x0U                          // base address (NULL)
                 | MPU_RBAR_VALID_Msk          // valid region
@@ -217,7 +217,6 @@ void BSP_init(void) {
     while ((RCC->CFGR & RCC_CFGR_SWS) != 0x8U) {
     }
     RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_PPRE) | 0x0U; // APB1 prescaler=1
-    SystemCoreClockUpdate();
 
     // enable GPIO port PA clock
     RCC->IOPENR |= (1U << 0U);
@@ -246,10 +245,8 @@ void BSP_init(void) {
     // configure Button B1 pin on GPIOC as input, no pull-up, pull-down
     GPIOC->MODER &= ~(3U << 2U*B1_PIN);
     GPIOC->PUPDR &= ~(3U << 2U*B1_PIN);
-}
-//............................................................................
-void BSP_start(void) {
-    // instantiate and start QP/C active objects...
+
+    // instantiate and start AOs...
     Periodic1_ctor();
     static QEvtPtr periodic1QSto[10]; // Event queue storage
     static StackType_t periodic1Stack[256];
@@ -359,9 +356,8 @@ QEvt const *BSP_getEvtPeriodic4(uint8_t num) {
 
 // QF callbacks ==============================================================
 void QF_onStartup(void) {
-    SystemCoreClockUpdate();
-
     // set up the SysTick timer to fire at BSP_TICKS_PER_SEC rate
+    SystemCoreClockUpdate();
     SysTick_Config((SystemCoreClock / BSP_TICKS_PER_SEC) + 1U);
 
     // set priorities of ISRs used in the system

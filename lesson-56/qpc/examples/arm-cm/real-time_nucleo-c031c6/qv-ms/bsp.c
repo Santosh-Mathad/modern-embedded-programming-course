@@ -147,8 +147,12 @@ void SysTick_Handler(void) {
     BSP_d1off();
 }
 
-// BSP functions =============================================================
-void BSP_init(void) {
+//============================================================================
+// BSP functions...
+
+void BSP_init(void const * const arg) {
+    Q_UNUSED_PAR(arg);
+
     // Configure the MPU to prevent NULL-pointer dereferencing ...
     MPU->RBAR = 0x0U                          // base address (NULL)
                 | MPU_RBAR_VALID_Msk          // valid region
@@ -201,9 +205,7 @@ void BSP_init(void) {
     // configure Button B1 pin on GPIOC as input, no pull-up, pull-down
     GPIOC->MODER &= ~(3U << 2U*B1_PIN);
     GPIOC->PUPDR &= ~(3U << 2U*B1_PIN);
-}
-//............................................................................
-void BSP_start(void) {
+
     // instantiate and start QP/C active objects...
     Periodic1_ctor();
     static QEvtPtr periodic1QSto[10]; // Event queue storage
@@ -306,9 +308,8 @@ QEvt const *BSP_getEvtPeriodic4(uint8_t num) {
 
 // QF callbacks ==============================================================
 void QF_onStartup(void) {
-    SystemCoreClockUpdate();
-
     // set up the SysTick timer to fire at BSP_TICKS_PER_SEC rate
+    SystemCoreClockUpdate();
     SysTick_Config((SystemCoreClock / BSP_TICKS_PER_SEC) + 1U);
 
     // set priorities of ISRs used in the system

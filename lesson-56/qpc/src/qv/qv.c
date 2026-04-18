@@ -134,7 +134,7 @@ int_t QF_run(void) {
     QF_onStartup(); // app. callback: configure and enable interrupts
 
     QF_INT_DISABLE();
-    for (;;) { // QV event loop...
+    for (;;) { // QV event-loop...
         // find the maximum prio. AO ready to run
         uint_fast8_t const p = (QPSet_notEmpty(&QV_priv_.readySet)
                                ? QPSet_findMax(&QV_priv_.readySet)
@@ -164,16 +164,14 @@ int_t QF_run(void) {
 
             QF_INT_ENABLE();
 
-            QEvt const * const e = QActive_get_(a);
-
-            // dispatch event (virtual call)
-            QASM_DISPATCH(a, e, p);
+            QEvt const * const e = QActive_get_(a); // queue not empty
+            QASM_DISPATCH(a, e, p); // dispatch event (virtual call)
 #if (QF_MAX_EPOOL > 0U)
-            QF_gc(e);
+            QF_gc(e); // check if the event is garbage, and collect it if so
 #endif
             QF_INT_DISABLE();
 
-            if (a->eQueue.frontEvt == (QEvt *)0) { // empty queue?
+            if (a->eQueue.frontEvt.e == (QEvt *)0) { // empty queue?
                 QPSet_remove(&QV_priv_.readySet, p);
             }
         }

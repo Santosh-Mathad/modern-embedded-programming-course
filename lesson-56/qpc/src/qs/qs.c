@@ -134,9 +134,10 @@ bool QS_fltCheck_(uint_fast8_t const recIdx,
 {
     // check the global filter (for the QS record ID) and
     // check the local filter (for the QS ID)
-    return ((QS_filt_.glb[recIdx] & recBit) != 0U)
-           && ((QS_filt_.loc[qsId >> 5U]
-               & ((uint32_t)1U << (qsId & 0x1FU))) != 0U);
+    return ((QS_filt_.glb[recIdx] & recBit) == 0U)
+        ? false
+        : ((QS_filt_.loc[qsId >> 5U]
+           & ((uint32_t)1U << (qsId & 0x1FU))) != 0U);
 }
 //............................................................................
 bool QS_glbCheck_(uint_fast8_t const recIdx, uint_fast32_t const recBit) {
@@ -146,7 +147,8 @@ bool QS_glbCheck_(uint_fast8_t const recIdx, uint_fast32_t const recBit) {
 //............................................................................
 bool QS_locCheck_(uint_fast8_t const qsId) {
     // check the local filter (for the QS ID)
-    return (QS_filt_.loc[qsId >> 5U] & ((uint32_t)1U << (qsId & 0x1FU))) != 0U;
+    return (QS_filt_.loc[qsId >> 5U]
+        & ((uint32_t)1U << (qsId & 0x1FU))) != 0U;
 }
 //............................................................................
 void QS_glbFilter_(int_fast16_t const filterSpec) {

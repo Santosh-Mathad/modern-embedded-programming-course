@@ -109,7 +109,6 @@ int QF_run(void) {
 
     QF_onStartup(); // application-specific startup callback
 
-
     if (l_tickMsec != 0U) { // system clock tick configured?
         // create the ticker thread...
         HANDLE ticker = CreateThread(NULL, 1024, &ticker_thread,
@@ -142,13 +141,14 @@ int QF_run(void) {
             Q_ASSERT_INCRIT(320, a != (QActive *)0);
             QF_CRIT_EXIT();
 
-            QEvt const *e = QActive_get_(a);
-            // dispatch event (virtual call)
-            QASM_DISPATCH(&a->super, e, a->prio);
-            QF_gc(e);
+            QEvt const *e = QActive_get_(a); // queue not empty
+            QASM_DISPATCH(a, e, a->prio); // dispatch event (virtual call)
+#if (QF_MAX_EPOOL > 0U)
+            QF_gc(e); // check if the event is garbage, and collect it if so
+#endif
 
             QF_CRIT_ENTRY();
-            if (a->eQueue.frontEvt == (QEvt *)0) { // empty queue?
+            if (a->eQueue.frontEvt.e == (QEvt *)0) { // empty queue?
                 QPSet_remove(&QF_readySet_, p);
             }
         }
